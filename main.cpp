@@ -54,15 +54,8 @@ int main() {
         }
     }
     cl::Context context({device});
-    // TODO Load kernel from file
-    std::string kernel_code =
-"__kernel void preprocess_image(__global float3* data) {\n"
-"    const float3 one = 1.0;\n"
-"    const float3 coef = 127.5;\n"
-"    int myid = get_global_id(0);\n"
-"    data[myid] = data[myid] / coef;"
-"    data[myid] = data[myid] - one;"
-"}";
+    std::ifstream kernel_file("kernels.cl");
+    std::string kernel_code(std::istreambuf_iterator<char>(kernel_file), (std::istreambuf_iterator<char>()));
     cl::Program::Sources sources;
     sources.push_back({kernel_code.c_str(), kernel_code.length()});
     cl::Program program(context, sources, &err);
