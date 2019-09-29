@@ -8,7 +8,20 @@
 #include <fstream>
 #include <memory>
 
-using namespace running_context;
+using namespace trained_layers;
+
+namespace {
+    cl::Context context;
+    cl::Program program;
+    cl::CommandQueue queue;
+}
+
+struct Data {
+    int width = 1;
+    int height = 1;
+    int channels = 1;
+    std::vector<float> data;
+};
 
 void debug(cl_int error) {
 #ifdef DEBUG
@@ -18,60 +31,68 @@ void debug(cl_int error) {
 #endif
 }
 
-
 // --------------------
 
-class Layer {
-public:
-    virtual std::vector<float> apply(std::vector<float>& input) = 0;
+struct Layer {
+    virtual Data apply(std::vector<float>& input) = 0;
 
     int input_dimension_0;
     int input_dimension_1;
     int input_dimension_2;
 };
 
-class ZeroPadding2DLayer : public Layer {
-public:
-    std::vector<float> apply(std::vector<float>& input) override;
+struct ZeroPadding2DLayer : public Layer {
+    Data apply(std::vector<float>& input) override;
 
     int padding_width = 1;
 };
 
-class Conv2DLayer : public Layer {
+struct Conv2DLayer : public Layer {
+    Data apply(std::vector<float>& input) override;
+    Conv2DLayer(int out_depth, int conv_size0, int conv_size1, int strides, float* bias, float* kernels) :
+                out_depth(out_depth),
+                conv_size0(conv_size0),
+                conv_size1(conv_size1),
+                strides(strides),
+                bias(bias),
+                kernels(kernels) {}
+
+    enum class Padding {
+        PADDING_VALID = 0,
+        PADDING_SAME
+    };
+
+    int out_depth;
+    int conv_size0;
+    int conv_size1;
+    int strides;
+    float* bias = nullptr;
+    float* kernels = nullptr;
+    Padding padding = Padding::PADDING_VALID; // TODO: handle PADDING_SAME
+};
+
+struct Activation2DLayer : public Layer {
+    Data apply(std::vector<float>& input) override;
+};
+
+struct Relu2DLayer : public Layer {
+    Data apply(std::vector<float>& input) override;
+};
+
+struct DepthwiseConv2DLayer : public Layer {
+    Data apply(std::vector<float>& input) override;
+};
+
+struct GlobalAveragePooling2DLayer : public Layer {
+    Data apply(std::vector<float>& input) override;
+};
+
+struct Dense2DLayer : public Layer {
 public:
-    std::vector<float> apply(std::vector<float>& input) override;
+    Data apply(std::vector<float>& input) override;
 };
 
-class Activation2DLayer : public Layer {
-public:
-    std::vector<float> apply(std::vector<float>& input) override;
-};
-
-class Relu2DLayer : public Layer {
-public:
-    std::vector<float> apply(std::vector<float>& input) override;
-};
-
-class DepthwiseConv2DLayer : public Layer {
-public:
-    std::vector<float> apply(std::vector<float>& input) override;
-};
-
-class GlobalAveragePooling2DLayer : public Layer {
-public:
-    std::vector<float> apply(std::vector<float>& input) override;
-};
-
-class Dense2DLayer : public Layer {
-public:
-    std::vector<float> apply(std::vector<float>& input) override;
-};
-
-struct MobileNet {
-    std::vector<std::unique_ptr<Layer>> layers;
-};
-
-std::vector<float> ZeroPadding2DLayer::apply(std::vector<float>& input) {
+Data ZeroPadding2DLayer::apply(std::vector<float>& input) {
     std::vector<float> output((input_dimension_0 + 2 * padding_width) * (input_dimension_1 + 2 * padding_width) * input_dimension_2, 0);
     cl_int err;
     cl::Event to_wait;
@@ -96,39 +117,86 @@ std::vector<float> ZeroPadding2DLayer::apply(std::vector<float>& input) {
             cl::NullRange, nullptr, &to_wait);
     debug(err);
     to_wait.wait();
-    return output;
+    Data res;
+    res.width = input_dimension_0 + 2;
+    res.height = input_dimension_1 + 2;
+    res.channels = input_dimension_2;
+    res.data = std::move(output);
+    return res;
 }
 
-std::vector<float> Conv2DLayer::apply(std::vector<float>& input) {
+Data Conv2DLayer::apply(std::vector<float>& input) {
+    if (padding != Padding::PADDING_VALID || conv_size0 != 3 || conv_size1 != 3) {
+        throw std::runtime_error("These cases are not implemented");
+    }
+    std::vector<float> output((input_dimension_0 - 1) / strides * (input_dimension_1 - 1) / strides * out_depth, 0);
+    cl_int err;
+    cl::Event to_wait;
+    cl::Buffer buffer(context, CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR, sizeof(float) * input.size(), input.data(), &err);
+    cl::Buffer buffer2(context, CL_MEM_READ_WRITE | CL_MEM_USE_HOST_PTR, sizeof(float) * output.size(), output.data(), &err);
+    cl::Buffer buffer3(context, CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR, sizeof(float) * input_dimension_2 * conv_size0 * conv_size1 * out_depth, kernels, &err);
+    cl::Buffer buffer4(context, CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR, sizeof(float) * out_depth, bias, &err);
+    debug(err);
+    cl::Kernel kernel(program, "conv2d_kernel9", &err);
+    debug(err);
+    err = kernel.setArg(0, buffer);
+    debug(err);
+    err = kernel.setArg(1, buffer2);
+    debug(err);
+    err = kernel.setArg(2, buffer3);
+    debug(err);
+    err = kernel.setArg(3, buffer4);
+    debug(err);
+    err = kernel.setArg(4, strides);
+    debug(err);
+    err = kernel.setArg(5, input_dimension_2);
+    debug(err);
+    err = kernel.setArg(6, (input_dimension_0 - 1) / strides);
+    debug(err);
+    err = kernel.setArg(7, (input_dimension_1 - 1) / strides);
+    debug(err);
+    err = kernel.setArg(8, out_depth);
+    debug(err);
+    err = queue.enqueueNDRangeKernel(kernel, cl::NullRange, cl::NDRange((input_dimension_0 - 1) / strides,
+            (input_dimension_1 - 1) / strides, out_depth), cl::NullRange, nullptr, &to_wait);
+    debug(err);
+    to_wait.wait();
+    Data res;
+    res.width = (input_dimension_0 - 1) / strides;
+    res.height = (input_dimension_1 - 1) / strides;
+    res.channels = out_depth;
+    res.data = std::move(output);
+    return res;
+}
+
+Data Activation2DLayer::apply(std::vector<float>& input) {
 
 }
 
-std::vector<float> Activation2DLayer::apply(std::vector<float>& input) {
+Data Relu2DLayer::apply(std::vector<float>& input) {
 
 }
 
-std::vector<float> Relu2DLayer::apply(std::vector<float>& input) {
+Data DepthwiseConv2DLayer::apply(std::vector<float>& input) {
 
 }
 
-std::vector<float> DepthwiseConv2DLayer::apply(std::vector<float>& input) {
+Data GlobalAveragePooling2DLayer::apply(std::vector<float>& input) {
 
 }
 
-std::vector<float> GlobalAveragePooling2DLayer::apply(std::vector<float>& input) {
+Data Dense2DLayer::apply(std::vector<float>& input) {
 
 }
 
-std::vector<float> Dense2DLayer::apply(std::vector<float>& input) {
-
-}
+struct MobileNet {
+    std::vector<std::unique_ptr<Layer>> layers;
+};
 
 MobileNet init_mobilenet() {
     MobileNet res;
     res.layers.emplace_back(new ZeroPadding2DLayer());
-    res.layers.back()->input_dimension_0 = 128; // TODO: параметризировать потом
-    res.layers.back()->input_dimension_1 = 128;
-    res.layers.back()->input_dimension_2 = 3;
+    res.layers.emplace_back(new Conv2DLayer(8, 3, 3, 2, LAYER_LEVEL_2_BIAS, LAYER_LEVEL_2_WEIGHTS));
     return res;
 }
 
@@ -138,14 +206,7 @@ namespace {
     MobileNet mobile_net;
 }
 
-struct Image {
-    int width;
-    int height;
-    int channels;
-    std::vector<float> data;
-};
-
-void preprocess_image(Image& image) {
+void preprocess_image(Data& image) {
     cl_int err;
     cl::Event to_wait;
     cl::Buffer buffer(context, CL_MEM_READ_WRITE | CL_MEM_USE_HOST_PTR, sizeof(float) * image.data.size(), image.data.data(), &err);
@@ -160,12 +221,15 @@ void preprocess_image(Image& image) {
     to_wait.wait();
 }
 
-std::vector<float> apply_mobilenet(const Image& image) {
-    std::vector<float> features = image.data;
+std::vector<float> apply_mobilenet(const Data& image) {
+    Data features = image;
     for (auto& layer : mobile_net.layers) {
-        features = layer->apply(features);
+        layer->input_dimension_0 = image.width;
+        layer->input_dimension_1 = image.height;
+        layer->input_dimension_2 = image.channels;
+        features = layer->apply(features.data);
     }
-    return features;
+    return features.data;
 }
 
 int main(int argc, char** argv) {
@@ -181,7 +245,7 @@ int main(int argc, char** argv) {
     debug(err);
     auto device = devices.front();
 
-    std::vector<Image> images;
+    std::vector<Data> images;
     {
         std::ifstream input;
         input.open(argv[1]);
@@ -189,7 +253,7 @@ int main(int argc, char** argv) {
         input >> num_images;
         std::cout << "Getting " << num_images << " images" << std::endl;
         for (int i = 0; i < num_images; ++i) {
-            Image image;
+            Data image;
             input >> image.height;
             input >> image.width;
             input >> image.channels;
@@ -228,8 +292,10 @@ int main(int argc, char** argv) {
     }
     cl::finish();
     // TODO: remove cout
-    for (int i = 0; i < 350; ++i) {
-        std::cout << "(" << res[3*i] << ", " << res[3*i+1] << ", " << res[3*i+2] << "), ";
+    for (int i = 0; i < 50; ++i) {
+        std::cout << "(" << res[8*i] << ", " << res[8*i+1] << ", " << res[8*i+2] << ", " <<
+                    res[8*i+3] << ", " << res[8*i+4] << ", " << res[8*i+5] << ", " <<
+                    res[8*i+6] << ", " << res[8*i+7] <<  "), ";
     }
     std::cout << std::endl;
     return 0;
