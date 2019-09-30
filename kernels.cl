@@ -42,3 +42,12 @@ __kernel void conv2d_kernel9(__global const float* input, __global float* output
         output[((x + y * width) * out_shape) + z] += bias[z];
     }
 }
+
+__kernel void relu(__global float* data) {
+    int index = get_global_id(0);
+    if (data[index] < 0) {
+        data[index] = 0;
+    } else if (data[index] > 1) {
+        data[index] = 1;
+    }
+}

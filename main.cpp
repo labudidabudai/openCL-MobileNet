@@ -7,6 +7,7 @@
 #include <ios>
 #include <fstream>
 #include <memory>
+#include <cassert>
 
 using namespace trained_layers;
 
@@ -129,7 +130,7 @@ Data Conv2DLayer::apply(std::vector<float>& input) {
     if (padding != Padding::PADDING_VALID || conv_size0 != 3 || conv_size1 != 3) {
         throw std::runtime_error("These cases are not implemented");
     }
-    std::vector<float> output((input_dimension_0 - 1) / strides * (input_dimension_1 - 1) / strides * out_depth, 0);
+    std::vector<float> output(((input_dimension_0 - 1) / strides) * ((input_dimension_1 - 1) / strides) * out_depth, 0);
     cl_int err;
     cl::Event to_wait;
     cl::Buffer buffer(context, CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR, sizeof(float) * input.size(), input.data(), &err);
@@ -169,12 +170,24 @@ Data Conv2DLayer::apply(std::vector<float>& input) {
     return res;
 }
 
-Data Activation2DLayer::apply(std::vector<float>& input) {
-
-}
-
 Data Relu2DLayer::apply(std::vector<float>& input) {
-
+    cl_int err;
+    cl::Event to_wait;
+    cl::Buffer buffer(context, CL_MEM_READ_WRITE | CL_MEM_USE_HOST_PTR, sizeof(float) * input.size(), input.data(), &err);
+    debug(err);
+    cl::Kernel kernel(program, "relu", &err);
+    debug(err);
+    err = kernel.setArg(0, buffer);
+    debug(err);
+    err = queue.enqueueNDRangeKernel(kernel, cl::NullRange, cl::NDRange(input.size()), cl::NullRange, nullptr, &to_wait);
+    debug(err);
+    to_wait.wait();
+    Data res;
+    res.width = input_dimension_0;
+    res.height = input_dimension_1;
+    res.channels = input_dimension_2;
+    res.data = input;
+    return res;
 }
 
 Data DepthwiseConv2DLayer::apply(std::vector<float>& input) {
@@ -197,6 +210,7 @@ MobileNet init_mobilenet() {
     MobileNet res;
     res.layers.emplace_back(new ZeroPadding2DLayer());
     res.layers.emplace_back(new Conv2DLayer(8, 3, 3, 2, LAYER_LEVEL_2_BIAS, LAYER_LEVEL_2_WEIGHTS));
+    res.layers.emplace_back(new Relu2DLayer);
     return res;
 }
 
@@ -224,9 +238,10 @@ void preprocess_image(Data& image) {
 std::vector<float> apply_mobilenet(const Data& image) {
     Data features = image;
     for (auto& layer : mobile_net.layers) {
-        layer->input_dimension_0 = image.width;
-        layer->input_dimension_1 = image.height;
-        layer->input_dimension_2 = image.channels;
+        layer->input_dimension_0 = features.width;
+        layer->input_dimension_1 = features.height;
+        layer->input_dimension_2 = features.channels;
+        assert(features.data.size() == features.width * features.height * features.channels);
         features = layer->apply(features.data);
     }
     return features.data;
