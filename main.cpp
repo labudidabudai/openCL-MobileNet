@@ -72,16 +72,30 @@ struct Conv2DLayer : public Layer {
     Padding padding = Padding::PADDING_VALID; // TODO: handle PADDING_SAME
 };
 
-struct Activation2DLayer : public Layer {
-    Data apply(std::vector<float>& input) override;
-};
-
 struct Relu2DLayer : public Layer {
     Data apply(std::vector<float>& input) override;
 };
 
 struct DepthwiseConv2DLayer : public Layer {
     Data apply(std::vector<float>& input) override;
+    DepthwiseConv2DLayer(int conv_size0, int conv_size1, int strides, float* bias, float* kernels) :
+            conv_size0(conv_size0),
+            conv_size1(conv_size1),
+            strides(strides),
+            bias(bias),
+            kernels(kernels) {}
+
+    enum class Padding {
+        PADDING_VALID = 0,
+        PADDING_SAME
+    };
+
+    int conv_size0;
+    int conv_size1;
+    int strides;
+    float* bias = nullptr;
+    float* kernels = nullptr;
+    Padding padding = Padding::PADDING_VALID; // TODO: handle PADDING_SAME
 };
 
 struct GlobalAveragePooling2DLayer : public Layer {
@@ -191,7 +205,45 @@ Data Relu2DLayer::apply(std::vector<float>& input) {
 }
 
 Data DepthwiseConv2DLayer::apply(std::vector<float>& input) {
-
+    if (padding != Padding::PADDING_VALID || conv_size0 != 3 || conv_size1 != 3) {
+        throw std::runtime_error("These cases are not implemented");
+    }
+    std::vector<float> output(((input_dimension_0 - 1) / strides) * ((input_dimension_1 - 1) / strides) * input_dimension_2, 0);
+    cl_int err;
+    cl::Event to_wait;
+    cl::Buffer buffer(context, CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR, sizeof(float) * input.size(), input.data(), &err);
+    cl::Buffer buffer2(context, CL_MEM_READ_WRITE | CL_MEM_USE_HOST_PTR, sizeof(float) * output.size(), output.data(), &err);
+    cl::Buffer buffer3(context, CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR, sizeof(float) * input_dimension_2 * conv_size0 * conv_size1, kernels, &err);
+    cl::Buffer buffer4(context, CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR, sizeof(float) * input_dimension_2, bias, &err);
+    debug(err);
+    cl::Kernel kernel(program, "depthwise_conv2d", &err);
+    debug(err);
+    err = kernel.setArg(0, buffer);
+    debug(err);
+    err = kernel.setArg(1, buffer2);
+    debug(err);
+    err = kernel.setArg(2, buffer3);
+    debug(err);
+    err = kernel.setArg(3, buffer4);
+    debug(err);
+    err = kernel.setArg(4, strides);
+    debug(err);
+    err = kernel.setArg(5, input_dimension_2);
+    debug(err);
+    err = kernel.setArg(6, (input_dimension_0 - 1) / strides);
+    debug(err);
+    err = kernel.setArg(7, (input_dimension_1 - 1) / strides);
+    debug(err);
+    err = queue.enqueueNDRangeKernel(kernel, cl::NullRange, cl::NDRange((input_dimension_0 - 1) / strides,
+                                                                        (input_dimension_1 - 1) / strides, input_dimension_2), cl::NullRange, nullptr, &to_wait);
+    debug(err);
+    to_wait.wait();
+    Data res;
+    res.width = (input_dimension_0 - 1) / strides;
+    res.height = (input_dimension_1 - 1) / strides;
+    res.channels = input_dimension_2;
+    res.data = std::move(output);
+    return res;
 }
 
 Data GlobalAveragePooling2DLayer::apply(std::vector<float>& input) {
@@ -208,8 +260,10 @@ struct MobileNet {
 
 MobileNet init_mobilenet() {
     MobileNet res;
-    res.layers.emplace_back(new ZeroPadding2DLayer());
+    res.layers.emplace_back(new ZeroPadding2DLayer);
     res.layers.emplace_back(new Conv2DLayer(8, 3, 3, 2, LAYER_LEVEL_2_BIAS, LAYER_LEVEL_2_WEIGHTS));
+    res.layers.emplace_back(new Relu2DLayer);
+    res.layers.emplace_back(new DepthwiseConv2DLayer(3, 3, 2, LAYER_LEVEL_4_BIAS, LAYER_LEVEL_4_WEIGHTS));
     res.layers.emplace_back(new Relu2DLayer);
     return res;
 }

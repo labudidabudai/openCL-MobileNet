@@ -20,13 +20,12 @@ __kernel void conv2d_kernel9(__global const float* input, __global float* output
     int x = get_global_id(0);
     int y = get_global_id(1);
     int z = get_global_id(2);
-    int width2 = width * 2 + 1;
+    int width2 = (width + 1) * strides - 1;
     int cor_x = x * strides + 1;
     int cor_y = y * strides + 1;
     int i;
     for (i = 0; i < in_shape; ++i) {
         int addr = z * 9 * in_shape + i * 9;
-        //float* current_kernel = kernels + addr;
         float conv = input[((cor_x - 1) + (cor_y - 1) * width2) * in_shape + z] * kernels[addr+0]
             + input[((cor_x)+(cor_y - 1) * width2) * in_shape + z] * kernels[addr+1]
             + input[((cor_x + 1)+(cor_y - 1) * width2) * in_shape + z] * kernels[addr+2]
@@ -40,6 +39,32 @@ __kernel void conv2d_kernel9(__global const float* input, __global float* output
     }
     if (bias) {
         output[((x + y * width) * out_shape) + z] += bias[z];
+    }
+}
+
+__kernel void depthwise_conv2d(__global const float* input, __global float* output, __global const float* kernels, __global const float* bias,
+                               int strides, int depth, int width, int height) {
+    int x = get_global_id(0);
+    int y = get_global_id(1);
+    int z = get_global_id(2);
+    int width2 = (width + 1) * strides - 1;
+    int cor_x = x * strides + 1;
+    int cor_y = y * strides + 1;
+    int i;
+
+    int addr = z * 9;
+    float conv = input[((cor_x - 1) + (cor_y - 1) * width2) * depth + z] * kernels[addr+0]
+        + input[((cor_x)+(cor_y - 1) * width2) * depth + z] * kernels[addr+1]
+        + input[((cor_x + 1)+(cor_y - 1) * width2) * depth + z] * kernels[addr+2]
+        + input[((cor_x - 1)+(cor_y) * width2) * depth + z] * kernels[addr+3]
+        + input[((cor_x)+(cor_y) * width2) * depth + z] * kernels[addr+4]
+        + input[((cor_x + 1)+(cor_y) * width2) * depth + z] * kernels[addr+5]
+        + input[((cor_x - 1)+(cor_y + 1) * width2) * depth + z] * kernels[addr+6]
+        + input[((cor_x)+(cor_y + 1) * width2) * depth + z] * kernels[addr+7]
+        + input[((cor_x + 1)+(cor_y + 1) * width2) * depth + z] * kernels[addr+8];
+    output[((x + y * width) * depth) + z] += conv;
+    if (bias) {
+        output[((x + y * width) * depth) + z] += bias[z];
     }
 }
 
