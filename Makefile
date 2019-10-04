@@ -6,7 +6,7 @@ devices:
 	g++ devices.cpp -L${OPENCL_LIB_PATH} -lOpenCL -o devices
 
 main:
-	g++ main.cpp -L${OPENCL_LIB_PATH} -DDEBUG -lOpenCL -o main
+	g++ main.cpp -L${OPENCL_LIB_PATH} -DDEBUG -DDEBUG_LAYERS -lOpenCL -o main
 
 clear:
 	rm main
