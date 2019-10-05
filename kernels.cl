@@ -56,7 +56,7 @@ __kernel void conv2d_kernel_1_same(__global const float* input, __global float* 
     }
 }
 
-__kernel void depthwise_conv2d(__global const float* input, __global float* output, __global const float* kernels, __global const float* bias,
+__kernel void depthwise_conv2d_kernel_9_valid(__global const float* input, __global float* output, __global const float* kernels, __global const float* bias,
                                int strides, int depth, int width, int height) {
     int x = get_global_id(0);
     int y = get_global_id(1);
@@ -126,4 +126,14 @@ __kernel void relu(__global float* data) {
     } else if (data[index] > 1) {
         data[index] = 1;
     }
+}
+
+__kernel void sum_by_channels(__global const float* input, __global float* output, int num_channels) {
+    int x = get_global_id(0);
+    output[x % num_channels] += input[x];
+}
+
+__kernel void apply_reduction(__global float* data, float reduction_coef) {
+    int index = get_global_id(0);
+    data[index] /= reduction_coef;
 }

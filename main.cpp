@@ -1,7 +1,6 @@
 #include <CL/cl.hpp>
 
 #include "ZFC_MobileNet_CPU.h"
-#include "run_ctxt.h"
 
 #include <iostream>
 #include <ios>
@@ -235,7 +234,7 @@ Data DepthwiseConv2DLayer::apply(std::vector<float>& input) {
         res.width = (input_dimension_0 - 1) / strides;
         res.height = (input_dimension_1 - 1) / strides;
         res.channels = input_dimension_2;
-        kernel.reset(new cl::Kernel(program, "depthwise_conv2d", &err));
+        kernel.reset(new cl::Kernel(program, "depthwise_conv2d_kernel_9_valid", &err));
         debug(err);
     } else {
         res.width = input_dimension_0;
@@ -276,7 +275,47 @@ Data DepthwiseConv2DLayer::apply(std::vector<float>& input) {
 }
 
 Data GlobalAveragePooling2DLayer::apply(std::vector<float>& input) {
+    Data res;
+    res.width = 1;
+    res.height = 1;
+    res.channels = input_dimension_2;
 
+    std::vector<float> output(res.channels, 0);
+    cl::Event to_wait;
+    cl_int err;
+    cl::Buffer buffer(context, CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR, sizeof(float) * input.size(), input.data(), &err);
+    cl::Buffer buffer2(context, CL_MEM_READ_WRITE | CL_MEM_USE_HOST_PTR, sizeof(float) * output.size(), output.data(), &err);
+    debug(err);
+
+    {
+        cl::Kernel kernel(program, "sum_by_channels", &err);
+        debug(err);
+        err = kernel.setArg(0, buffer);
+        debug(err);
+        err = kernel.setArg(1, buffer2);
+        debug(err);
+        err = kernel.setArg(2, res.channels);
+        debug(err);
+        err = queue.enqueueNDRangeKernel(kernel, cl::NullRange, cl::NDRange(input.size()), cl::NullRange, nullptr, &to_wait);
+        debug(err);
+        to_wait.wait();
+    }
+
+    {
+        float reduction_coef = input_dimension_0 * input_dimension_1;
+        cl::Kernel kernel(program, "apply_reduction", &err);
+        debug(err);
+        err = kernel.setArg(0, buffer2);
+        debug(err);
+        err = kernel.setArg(1, reduction_coef);
+        debug(err);
+        err = queue.enqueueNDRangeKernel(kernel, cl::NullRange, cl::NDRange(output.size()), cl::NullRange, nullptr, &to_wait);
+        debug(err);
+        to_wait.wait();
+    }
+
+    res.data = std::move(output);
+    return res;
 }
 
 Data Dense2DLayer::apply(std::vector<float>& input) {
@@ -408,6 +447,7 @@ MobileNet init_mobilenet() {
     // Layer59
     res.layers.emplace_back(new Relu2DLayer);
     // Layer60
+    res.layers.emplace_back(new GlobalAveragePooling2DLayer);
     // Layer61
     return res;
 }
@@ -449,7 +489,6 @@ std::vector<float> apply_mobilenet(const Data& image) {
         int idx = 0;
         ++num_layer;
         output << std::fixed << std::setprecision(6);
-//        std::cout << features.width << " " << features.height << " " << features.channels << std::endl;
         for (int i = 0; i < features.width; ++i) {
             for (int j = 0; j < features.height; ++j) {
                 for (int k = 0; k < features.channels; ++k) {
