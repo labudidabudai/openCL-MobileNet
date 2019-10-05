@@ -110,8 +110,16 @@ struct GlobalAveragePooling2DLayer : public Layer {
 };
 
 struct Dense2DLayer : public Layer {
-public:
     Data apply(std::vector<float>& input) override;
+
+    Dense2DLayer(int out_shape, float* weights, float* bias) :
+            out_shape(out_shape),
+            weights(weights),
+            bias(bias) {}
+
+    int out_shape;
+    float* weights = nullptr;
+    float* bias = nullptr;
 };
 
 Data ZeroPadding2DLayer::apply(std::vector<float>& input) {
@@ -319,7 +327,79 @@ Data GlobalAveragePooling2DLayer::apply(std::vector<float>& input) {
 }
 
 Data Dense2DLayer::apply(std::vector<float>& input) {
+    Data res;
+    res.width = 1;
+    res.height = 1;
+    res.channels = out_shape;
 
+    std::vector<float> output(res.channels, 0);
+    float max_value = 0;
+    float sum = 0;
+    cl::Event to_wait;
+    cl_int err;
+    cl::Buffer buffer(context, CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR, sizeof(float) * input.size(), input.data(), &err);
+    cl::Buffer buffer2(context, CL_MEM_READ_WRITE | CL_MEM_USE_HOST_PTR, sizeof(float) * output.size(), output.data(), &err);
+    cl::Buffer buffer3(context, CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR, sizeof(float) * output.size() * input.size(), weights, &err);
+    cl::Buffer buffer4(context, CL_MEM_READ_WRITE | CL_MEM_USE_HOST_PTR, sizeof(float), &max_value, &err);
+    cl::Buffer buffer5(context, CL_MEM_READ_WRITE | CL_MEM_USE_HOST_PTR, sizeof(float), &sum, &err);
+    debug(err);
+
+    {
+        cl::Kernel kernel(program, "matrix_multiplication", &err);
+        debug(err);
+        err = kernel.setArg(0, buffer);
+        debug(err);
+        err = kernel.setArg(1, buffer3);
+        debug(err);
+        err = kernel.setArg(2, buffer2);
+        debug(err);
+        err = kernel.setArg(3, input_dimension_2);
+        debug(err);
+        err = queue.enqueueNDRangeKernel(kernel, cl::NullRange, cl::NDRange(output.size()), cl::NullRange, nullptr, &to_wait);
+        debug(err);
+        to_wait.wait();
+    }
+
+    {
+        cl::Kernel kernel(program, "max_value", &err);
+        debug(err);
+        err = kernel.setArg(0, buffer2);
+        debug(err);
+        err = kernel.setArg(1, buffer4);
+        debug(err);
+        err = queue.enqueueNDRangeKernel(kernel, cl::NullRange, cl::NDRange(output.size()), cl::NullRange, nullptr, &to_wait);
+        debug(err);
+        to_wait.wait();
+    }
+
+    {
+        cl::Kernel kernel(program, "softmax", &err);
+        debug(err);
+        err = kernel.setArg(0, buffer2);
+        debug(err);
+        err = kernel.setArg(1, max_value);
+        debug(err);
+        err = kernel.setArg(2, buffer5);
+        debug(err);
+        err = queue.enqueueNDRangeKernel(kernel, cl::NullRange, cl::NDRange(output.size()), cl::NullRange, nullptr, &to_wait);
+        debug(err);
+        to_wait.wait();
+    }
+
+    {
+        cl::Kernel kernel(program, "apply_reduction", &err);
+        debug(err);
+        err = kernel.setArg(0, buffer2);
+        debug(err);
+        err = kernel.setArg(1, sum);
+        debug(err);
+        err = queue.enqueueNDRangeKernel(kernel, cl::NullRange, cl::NDRange(output.size()), cl::NullRange, nullptr, &to_wait);
+        debug(err);
+        to_wait.wait();
+    }
+
+    res.data = std::move(output);
+    return res;
 }
 
 struct MobileNet {
@@ -449,6 +529,7 @@ MobileNet init_mobilenet() {
     // Layer60
     res.layers.emplace_back(new GlobalAveragePooling2DLayer);
     // Layer61
+    res.layers.emplace_back(new Dense2DLayer(2, LAYER_LEVEL_61_WEIGHTS, nullptr));
     return res;
 }
 
@@ -503,8 +584,8 @@ std::vector<float> apply_mobilenet(const Data& image) {
 }
 
 int main(int argc, char** argv) {
-    if (argc != 2) {
-        std::cout << "Usage: " << argv[0] << " source_file" << std::endl;
+    if (argc != 3) {
+        std::cout << "Usage: " << argv[0] << " source_file output_file" << std::endl;
         return 1;
     }
     std::vector<cl::Platform> platforms;
@@ -548,25 +629,17 @@ int main(int argc, char** argv) {
     err = program.build({device});
     debug(err);
     queue = cl::CommandQueue(context, device);
-    // TODO: remove cout
-//    for (int i = 0; i < 350; ++i) {
-//        std::cout << "(" << images[0].data[3*i] << ", " << images[0].data[3*i+1] << ", " << images[0].data[3*i+2] << "), ";
-//    }
-//    std::cout << std::endl;
     mobile_net = init_mobilenet();
     std::vector<float> res;
+    std::ofstream output_file(argv[2]);
     for (auto& image : images) {
         preprocess_image(image);
         res = apply_mobilenet(image);
-        break; // TODO: remove this break after program is done
+        for (const auto& item : res) {
+            output_file << item << " ";
+        }
+        output_file << std::endl;
     }
     cl::finish();
-    // TODO: remove cout
-//    for (int i = 0; i < 50; ++i) {
-//        std::cout << "(" << res[8*i] << ", " << res[8*i+1] << ", " << res[8*i+2] << ", " <<
-//                    res[8*i+3] << ", " << res[8*i+4] << ", " << res[8*i+5] << ", " <<
-//                    res[8*i+6] << ", " << res[8*i+7] <<  "), ";
-//    }
-//    std::cout << std::endl;
     return 0;
 }

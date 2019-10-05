@@ -6,7 +6,10 @@ devices:
 	g++ devices.cpp -L${OPENCL_LIB_PATH} -lOpenCL -o devices
 
 main:
-	g++ main.cpp -L${OPENCL_LIB_PATH} -DDEBUG -DDEBUG_LAYERS -lOpenCL -o main
+	g++ main.cpp -L${OPENCL_LIB_PATH} -lOpenCL -o opencl_matrixnet
+
+with_debug:
+	g++ main.cpp -L${OPENCL_LIB_PATH} -DDEBUG -DDEBUG_LAYERS -lOpenCL -o opencl_matrixnet_debug
 
 clear:
 	rm main

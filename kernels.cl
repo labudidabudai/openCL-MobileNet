@@ -137,3 +137,22 @@ __kernel void apply_reduction(__global float* data, float reduction_coef) {
     int index = get_global_id(0);
     data[index] /= reduction_coef;
 }
+
+__kernel void matrix_multiplication(__global const float* input, __global const float* weights, __global float* output,
+                                    int in_shape) {
+    int y = get_global_id(0);
+    for (int x = 0; x < in_shape; ++x) {
+        output[y] += input[x] * weights[y * in_shape + x];
+    }
+}
+
+__kernel void max_value(__global const float* data, __global float* max_val) {
+    int index = get_global_id(0);
+    *max_val = max(*max_val, data[index]);
+}
+
+__kernel void softmax(__global float* data, float max_val, __global float* sum) {
+    int index = get_global_id(0);
+    data[index] = exp(data[index] - max_val);
+    *sum += data[index];
+}
