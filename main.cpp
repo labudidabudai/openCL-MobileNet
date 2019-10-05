@@ -84,24 +84,26 @@ struct Relu2DLayer : public Layer {
 
 struct DepthwiseConv2DLayer : public Layer {
     Data apply(std::vector<float>& input) override;
-    DepthwiseConv2DLayer(int conv_size0, int conv_size1, int strides, float* bias, float* kernels) :
-            conv_size0(conv_size0),
-            conv_size1(conv_size1),
-            strides(strides),
-            bias(bias),
-            kernels(kernels) {}
 
     enum class Padding {
         PADDING_VALID = 0,
         PADDING_SAME
     };
 
+    DepthwiseConv2DLayer(int conv_size0, int conv_size1, int strides, float* bias, float* kernels, Padding padding) :
+            conv_size0(conv_size0),
+            conv_size1(conv_size1),
+            strides(strides),
+            bias(bias),
+            kernels(kernels),
+            padding(padding) {}
+
     int conv_size0;
     int conv_size1;
     int strides;
     float* bias = nullptr;
     float* kernels = nullptr;
-    Padding padding = Padding::PADDING_VALID; // TODO: handle PADDING_SAME
+    Padding padding = Padding::PADDING_VALID;
 };
 
 struct GlobalAveragePooling2DLayer : public Layer {
@@ -154,9 +156,6 @@ Data ZeroPadding2DLayer::apply(std::vector<float>& input) {
 }
 
 Data Conv2DLayer::apply(std::vector<float>& input) {
-    if (padding != Padding::PADDING_VALID) {
-        throw std::runtime_error("These cases are not implemented");
-    }
     cl_int err;
     std::unique_ptr<cl::Kernel> kernel;
     Data res;
@@ -168,7 +167,7 @@ Data Conv2DLayer::apply(std::vector<float>& input) {
     } else if (conv_size0 == 1 && conv_size1 == 1 && padding == Padding::PADDING_SAME) {
         res.width = input_dimension_0;
         res.height = input_dimension_1;
-        kernel.reset(new cl::Kernel(program, "conv2d_kernel1", &err));
+        kernel.reset(new cl::Kernel(program, "conv2d_kernel_1_same", &err));
         debug(err);
     } else {
         throw std::runtime_error("This case is not implemented");
@@ -226,42 +225,50 @@ Data Relu2DLayer::apply(std::vector<float>& input) {
 }
 
 Data DepthwiseConv2DLayer::apply(std::vector<float>& input) {
-    if (padding != Padding::PADDING_VALID || conv_size0 != 3 || conv_size1 != 3) {
-        throw std::runtime_error("These cases are not implemented");
+    if (conv_size0 != 3 || conv_size1 != 3) {
+        throw std::runtime_error("This case is not implemented");
     }
+    std::unique_ptr<cl::Kernel> kernel;
+    cl_int err;
     Data res;
-    res.width = (input_dimension_0 - 2) / strides;
-    res.height = (input_dimension_1 - 2) / strides;
-    res.channels = input_dimension_2;
-
+    if (padding == Padding::PADDING_VALID) {
+        res.width = (input_dimension_0 - 1) / strides;
+        res.height = (input_dimension_1 - 1) / strides;
+        res.channels = input_dimension_2;
+        kernel.reset(new cl::Kernel(program, "depthwise_conv2d", &err));
+        debug(err);
+    } else {
+        res.width = input_dimension_0;
+        res.height = input_dimension_1;
+        res.channels = input_dimension_2;
+        kernel.reset(new cl::Kernel(program, "depthwise_conv2d_kernel_9_same", &err));
+        debug(err);
+    }
 
     std::vector<float> output(res.width * res.height * input_dimension_2, 0);
-    cl_int err;
     cl::Event to_wait;
     cl::Buffer buffer(context, CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR, sizeof(float) * input.size(), input.data(), &err);
     cl::Buffer buffer2(context, CL_MEM_READ_WRITE | CL_MEM_USE_HOST_PTR, sizeof(float) * output.size(), output.data(), &err);
     cl::Buffer buffer3(context, CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR, sizeof(float) * input_dimension_2 * conv_size0 * conv_size1, kernels, &err);
     cl::Buffer buffer4(context, CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR, sizeof(float) * input_dimension_2, bias, &err);
     debug(err);
-    cl::Kernel kernel(program, "depthwise_conv2d", &err);
+    err = kernel->setArg(0, buffer);
     debug(err);
-    err = kernel.setArg(0, buffer);
+    err = kernel->setArg(1, buffer2);
     debug(err);
-    err = kernel.setArg(1, buffer2);
+    err = kernel->setArg(2, buffer3);
     debug(err);
-    err = kernel.setArg(2, buffer3);
+    err = kernel->setArg(3, buffer4);
     debug(err);
-    err = kernel.setArg(3, buffer4);
+    err = kernel->setArg(4, strides);
     debug(err);
-    err = kernel.setArg(4, strides);
+    err = kernel->setArg(5, input_dimension_2);
     debug(err);
-    err = kernel.setArg(5, input_dimension_2);
+    err = kernel->setArg(6, res.width);
     debug(err);
-    err = kernel.setArg(6, res.width);
+    err = kernel->setArg(7, res.height);
     debug(err);
-    err = kernel.setArg(7, res.height);
-    debug(err);
-    err = queue.enqueueNDRangeKernel(kernel, cl::NullRange, cl::NDRange(res.width, res.height, input_dimension_2), cl::NullRange, nullptr, &to_wait);
+    err = queue.enqueueNDRangeKernel(*kernel, cl::NullRange, cl::NDRange(res.width, res.height, input_dimension_2), cl::NullRange, nullptr, &to_wait);
     debug(err);
     to_wait.wait();
     res.data = std::move(output);
@@ -288,30 +295,26 @@ MobileNet init_mobilenet() {
     res.layers.emplace_back(new Conv2DLayer(8, 3, 3, 2, LAYER_LEVEL_2_BIAS, LAYER_LEVEL_2_WEIGHTS, Conv2DLayer::Padding::PADDING_VALID));
     // Layer 3
     res.layers.emplace_back(new Relu2DLayer);
-//    // Layer 4
-//    res.layers.emplace_back(new ZeroPadding2DLayer);
-//    res.layers.emplace_back(new DepthwiseConv2DLayer(3, 3, 2, LAYER_LEVEL_4_BIAS, LAYER_LEVEL_4_WEIGHTS));
-//    // Layer 5
-//    res.layers.emplace_back(new Relu2DLayer);
-//    // Layer 6
-//    res.layers.emplace_back(new ZeroPadding2DLayer);
-//    res.layers.emplace_back(new Conv2DLayer(16, 1, 1, 1, LAYER_LEVEL_6_BIAS, LAYER_LEVEL_6_WEIGHTS));
-//    // Layer 7
-//    res.layers.emplace_back(new Relu2DLayer);
-//    // Layer8
-//    res.layers.emplace_back(new ZeroPadding2DLayer);
-//    // Layer9
-//    res.layers.emplace_back(new DepthwiseConv2DLayer(3, 3, 2, LAYER_LEVEL_9_BIAS, LAYER_LEVEL_9_WEIGHTS));
-//    // Layer10
-//    res.layers.emplace_back(new Relu2DLayer);
-//    // Layer11
-//    res.layers.emplace_back(new ZeroPadding2DLayer);
-//    res.layers.emplace_back(new Conv2DLayer(32, 1, 1, 1, LAYER_LEVEL_11_BIAS, LAYER_LEVEL_11_WEIGHTS));
-//    // Layer12
-//    res.layers.emplace_back(new Relu2DLayer);
-//    // Layer13
-//    res.layers.emplace_back(new ZeroPadding2DLayer);
-//    res.layers.emplace_back(new DepthwiseConv2DLayer(3, 3, 1, LAYER_LEVEL_13_BIAS, LAYER_LEVEL_13_WEIGHTS));
+    // Layer 4
+    res.layers.emplace_back(new DepthwiseConv2DLayer(3, 3, 2, LAYER_LEVEL_4_BIAS, LAYER_LEVEL_4_WEIGHTS, DepthwiseConv2DLayer::Padding::PADDING_SAME));
+    // Layer 5
+    res.layers.emplace_back(new Relu2DLayer);
+    // Layer 6
+    res.layers.emplace_back(new Conv2DLayer(16, 1, 1, 1, LAYER_LEVEL_6_BIAS, LAYER_LEVEL_6_WEIGHTS, Conv2DLayer::Padding::PADDING_SAME));
+    // Layer 7
+    res.layers.emplace_back(new Relu2DLayer);
+    // Layer8
+    res.layers.emplace_back(new ZeroPadding2DLayer);
+    // Layer9
+    res.layers.emplace_back(new DepthwiseConv2DLayer(3, 3, 2, LAYER_LEVEL_9_BIAS, LAYER_LEVEL_9_WEIGHTS, DepthwiseConv2DLayer::Padding::PADDING_VALID));
+    // Layer10
+    res.layers.emplace_back(new Relu2DLayer);
+    // Layer11
+    res.layers.emplace_back(new Conv2DLayer(32, 1, 1, 1, LAYER_LEVEL_11_BIAS, LAYER_LEVEL_11_WEIGHTS, Conv2DLayer::Padding::PADDING_SAME));
+    // Layer12
+    res.layers.emplace_back(new Relu2DLayer);
+    // Layer13
+//    res.layers.emplace_back(new DepthwiseConv2DLayer(3, 3, 1, LAYER_LEVEL_13_BIAS, LAYER_LEVEL_13_WEIGHTS, DepthwiseConv2DLayer::Padding::PADDING_VALID));
 //    // Layer14
 //    res.layers.emplace_back(new Relu2DLayer);
 //    // Layer15
@@ -463,7 +466,7 @@ std::vector<float> apply_mobilenet(const Data& image) {
         int idx = 0;
         ++num_layer;
         output << std::fixed << std::setprecision(6);
-        std::cout << features.width << " " << features.height << " " << features.channels << std::endl;
+//        std::cout << features.width << " " << features.height << " " << features.channels << std::endl;
         for (int i = 0; i < features.width; ++i) {
             for (int j = 0; j < features.height; ++j) {
                 for (int k = 0; k < features.channels; ++k) {
@@ -524,10 +527,10 @@ int main(int argc, char** argv) {
     debug(err);
     queue = cl::CommandQueue(context, device);
     // TODO: remove cout
-    for (int i = 0; i < 350; ++i) {
-        std::cout << "(" << images[0].data[3*i] << ", " << images[0].data[3*i+1] << ", " << images[0].data[3*i+2] << "), ";
-    }
-    std::cout << std::endl;
+//    for (int i = 0; i < 350; ++i) {
+//        std::cout << "(" << images[0].data[3*i] << ", " << images[0].data[3*i+1] << ", " << images[0].data[3*i+2] << "), ";
+//    }
+//    std::cout << std::endl;
     mobile_net = init_mobilenet();
     std::vector<float> res;
     for (auto& image : images) {
@@ -537,11 +540,11 @@ int main(int argc, char** argv) {
     }
     cl::finish();
     // TODO: remove cout
-    for (int i = 0; i < 50; ++i) {
-        std::cout << "(" << res[8*i] << ", " << res[8*i+1] << ", " << res[8*i+2] << ", " <<
-                    res[8*i+3] << ", " << res[8*i+4] << ", " << res[8*i+5] << ", " <<
-                    res[8*i+6] << ", " << res[8*i+7] <<  "), ";
-    }
-    std::cout << std::endl;
+//    for (int i = 0; i < 50; ++i) {
+//        std::cout << "(" << res[8*i] << ", " << res[8*i+1] << ", " << res[8*i+2] << ", " <<
+//                    res[8*i+3] << ", " << res[8*i+4] << ", " << res[8*i+5] << ", " <<
+//                    res[8*i+6] << ", " << res[8*i+7] <<  "), ";
+//    }
+//    std::cout << std::endl;
     return 0;
 }
