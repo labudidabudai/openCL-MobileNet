@@ -61,7 +61,7 @@ __kernel void depthwise_conv2d(__global const float* input, __global float* outp
     int x = get_global_id(0);
     int y = get_global_id(1);
     int z = get_global_id(2);
-    int width2 = (width + 1) * strides - 1;
+    int width2 = width * strides + 1;
     int cor_x = x * strides + 1;
     int cor_y = y * strides + 1;
     int i;

@@ -314,116 +314,99 @@ MobileNet init_mobilenet() {
     // Layer12
     res.layers.emplace_back(new Relu2DLayer);
     // Layer13
-//    res.layers.emplace_back(new DepthwiseConv2DLayer(3, 3, 1, LAYER_LEVEL_13_BIAS, LAYER_LEVEL_13_WEIGHTS, DepthwiseConv2DLayer::Padding::PADDING_VALID));
-//    // Layer14
-//    res.layers.emplace_back(new Relu2DLayer);
-//    // Layer15
-//    res.layers.emplace_back(new ZeroPadding2DLayer);
-//    res.layers.emplace_back(new Conv2DLayer(32, 1, 1, 1, LAYER_LEVEL_15_BIAS, LAYER_LEVEL_15_WEIGHTS));
-//    // Layer16
-//    res.layers.emplace_back(new Relu2DLayer);
-//    // Layer17
-//    res.layers.emplace_back(new ZeroPadding2DLayer);
-//    // Layer18
-//    res.layers.emplace_back(new DepthwiseConv2DLayer(3, 3, 2, LAYER_LEVEL_18_BIAS, LAYER_LEVEL_18_WEIGHTS));
-//    // Layer19
-//    res.layers.emplace_back(new Relu2DLayer);
-//    // Layer20
-//    res.layers.emplace_back(new ZeroPadding2DLayer);
-//    res.layers.emplace_back(new Conv2DLayer(64, 1, 1, 1, LAYER_LEVEL_20_BIAS, LAYER_LEVEL_20_WEIGHTS));
-//    // Layer21
-//    res.layers.emplace_back(new Relu2DLayer);
-//    // Layer22
-//    res.layers.emplace_back(new ZeroPadding2DLayer);
-//    res.layers.emplace_back(new DepthwiseConv2DLayer(3, 3, 1, LAYER_LEVEL_22_BIAS, LAYER_LEVEL_22_WEIGHTS));
-//    // Layer23
-//    res.layers.emplace_back(new Relu2DLayer);
-//    // Layer24
-//    res.layers.emplace_back(new ZeroPadding2DLayer);
-//    res.layers.emplace_back(new Conv2DLayer(64, 1, 1, 1, LAYER_LEVEL_24_BIAS, LAYER_LEVEL_24_WEIGHTS));
-//    // Layer25
-//    res.layers.emplace_back(new Relu2DLayer);
-//    // Layer26
-//    res.layers.emplace_back(new ZeroPadding2DLayer);
-//    // Layer27
-//    res.layers.emplace_back(new DepthwiseConv2DLayer(3, 3, 2, LAYER_LEVEL_27_BIAS, LAYER_LEVEL_27_WEIGHTS));
-//    // Layer28
-//    res.layers.emplace_back(new Relu2DLayer);
-//    // Layer29
-//    res.layers.emplace_back(new ZeroPadding2DLayer);
-//    res.layers.emplace_back(new Conv2DLayer(128, 1, 1, 1, LAYER_LEVEL_29_BIAS, LAYER_LEVEL_29_WEIGHTS));
-//    // Layer30
-//    res.layers.emplace_back(new Relu2DLayer);
-//    // Layer31
-//    res.layers.emplace_back(new ZeroPadding2DLayer);
-//    res.layers.emplace_back(new DepthwiseConv2DLayer(3, 3, 1, LAYER_LEVEL_31_BIAS, LAYER_LEVEL_31_WEIGHTS));
-//    // Layer32
-//    res.layers.emplace_back(new Relu2DLayer);
-//    // Layer33
-//    res.layers.emplace_back(new ZeroPadding2DLayer);
-//    res.layers.emplace_back(new Conv2DLayer(128, 1, 1, 1, LAYER_LEVEL_33_BIAS, LAYER_LEVEL_33_WEIGHTS));
-//    // Layer34
-//    res.layers.emplace_back(new Relu2DLayer);
-//    // Layer35
-//    res.layers.emplace_back(new ZeroPadding2DLayer);
-//    res.layers.emplace_back(new DepthwiseConv2DLayer(3, 3, 1, LAYER_LEVEL_35_BIAS, LAYER_LEVEL_35_WEIGHTS));
-//    // Layer36
-//    res.layers.emplace_back(new Relu2DLayer);
-//    // Layer37
-//    res.layers.emplace_back(new ZeroPadding2DLayer);
-//    res.layers.emplace_back(new Conv2DLayer(128, 1, 1, 1, LAYER_LEVEL_37_BIAS, LAYER_LEVEL_37_WEIGHTS));
-//    // Layer38
-//    res.layers.emplace_back(new Relu2DLayer);
-//    // Layer39
-//    res.layers.emplace_back(new ZeroPadding2DLayer);
-//    res.layers.emplace_back(new DepthwiseConv2DLayer(3, 3, 1, LAYER_LEVEL_39_BIAS, LAYER_LEVEL_39_WEIGHTS));
-//    // Layer40
-//    res.layers.emplace_back(new Relu2DLayer);
-//    // Layer41
-//    res.layers.emplace_back(new ZeroPadding2DLayer);
-//    res.layers.emplace_back(new Conv2DLayer(128, 1, 1, 1, LAYER_LEVEL_41_BIAS, LAYER_LEVEL_41_WEIGHTS));
-//    // Layer42
-//    res.layers.emplace_back(new Relu2DLayer);
-//    // Layer43
-//    res.layers.emplace_back(new ZeroPadding2DLayer);
-//    res.layers.emplace_back(new DepthwiseConv2DLayer(3, 3, 1, LAYER_LEVEL_43_BIAS, LAYER_LEVEL_43_WEIGHTS));
-//    // Layer44
-//    res.layers.emplace_back(new Relu2DLayer);
-//    // Layer45
-//    res.layers.emplace_back(new ZeroPadding2DLayer);
-//    res.layers.emplace_back(new Conv2DLayer(128, 1, 1, 1, LAYER_LEVEL_45_BIAS, LAYER_LEVEL_45_WEIGHTS));
-//    // Layer46
-//    res.layers.emplace_back(new Relu2DLayer);
-//    // Layer47
-//    res.layers.emplace_back(new ZeroPadding2DLayer);
-//    res.layers.emplace_back(new DepthwiseConv2DLayer(3, 3, 1, LAYER_LEVEL_47_BIAS, LAYER_LEVEL_47_WEIGHTS));
-//    // Layer48
-//    res.layers.emplace_back(new Relu2DLayer);
-//    // Layer49
-//    res.layers.emplace_back(new ZeroPadding2DLayer);
-//    res.layers.emplace_back(new Conv2DLayer(128, 1, 1, 1, LAYER_LEVEL_49_BIAS, LAYER_LEVEL_49_WEIGHTS));
-//    // Layer50
-//    res.layers.emplace_back(new Relu2DLayer);
-//    // Layer51
-//    res.layers.emplace_back(new ZeroPadding2DLayer);
-//    // Layer52
-//    res.layers.emplace_back(new DepthwiseConv2DLayer(3, 3, 2, LAYER_LEVEL_52_BIAS, LAYER_LEVEL_52_WEIGHTS));
-//    // Layer53
-//    res.layers.emplace_back(new Relu2DLayer);
-//    // Layer54
-//    res.layers.emplace_back(new ZeroPadding2DLayer);
-//    res.layers.emplace_back(new Conv2DLayer(256, 1, 1, 1, LAYER_LEVEL_54_BIAS, LAYER_LEVEL_54_WEIGHTS));
-//    // Layer55
-//    res.layers.emplace_back(new Relu2DLayer);
-//    // Layer56
-//    res.layers.emplace_back(new DepthwiseConv2DLayer(3, 3, 1, LAYER_LEVEL_56_BIAS, LAYER_LEVEL_56_WEIGHTS));
-//    // Layer57
-//    res.layers.emplace_back(new Relu2DLayer);
-//    // Layer58
-//    res.layers.emplace_back(new ZeroPadding2DLayer);
-//    res.layers.emplace_back(new Conv2DLayer(256, 1, 1, 1, LAYER_LEVEL_58_BIAS, LAYER_LEVEL_58_WEIGHTS));
-//    // Layer59
-//    res.layers.emplace_back(new Relu2DLayer);
+    res.layers.emplace_back(new DepthwiseConv2DLayer(3, 3, 1, LAYER_LEVEL_13_BIAS, LAYER_LEVEL_13_WEIGHTS, DepthwiseConv2DLayer::Padding::PADDING_SAME));
+    // Layer14
+    res.layers.emplace_back(new Relu2DLayer);
+    // Layer15
+    res.layers.emplace_back(new Conv2DLayer(32, 1, 1, 1, LAYER_LEVEL_15_BIAS, LAYER_LEVEL_15_WEIGHTS, Conv2DLayer::Padding::PADDING_SAME));
+    // Layer16
+    res.layers.emplace_back(new Relu2DLayer);
+    // Layer17
+    res.layers.emplace_back(new ZeroPadding2DLayer);
+    // Layer18
+    res.layers.emplace_back(new DepthwiseConv2DLayer(3, 3, 2, LAYER_LEVEL_18_BIAS, LAYER_LEVEL_18_WEIGHTS, DepthwiseConv2DLayer::Padding::PADDING_VALID));
+    // Layer19
+    res.layers.emplace_back(new Relu2DLayer);
+    // Layer20
+    res.layers.emplace_back(new Conv2DLayer(64, 1, 1, 1, LAYER_LEVEL_20_BIAS, LAYER_LEVEL_20_WEIGHTS, Conv2DLayer::Padding::PADDING_SAME));
+    // Layer21
+    res.layers.emplace_back(new Relu2DLayer);
+    // Layer22
+    res.layers.emplace_back(new DepthwiseConv2DLayer(3, 3, 1, LAYER_LEVEL_22_BIAS, LAYER_LEVEL_22_WEIGHTS, DepthwiseConv2DLayer::Padding::PADDING_SAME));
+    // Layer23
+    res.layers.emplace_back(new Relu2DLayer);
+    // Layer24
+    res.layers.emplace_back(new Conv2DLayer(64, 1, 1, 1, LAYER_LEVEL_24_BIAS, LAYER_LEVEL_24_WEIGHTS, Conv2DLayer::Padding::PADDING_SAME));
+    // Layer25
+    res.layers.emplace_back(new Relu2DLayer);
+    // Layer26
+    res.layers.emplace_back(new ZeroPadding2DLayer);
+    // Layer27
+    res.layers.emplace_back(new DepthwiseConv2DLayer(3, 3, 2, LAYER_LEVEL_27_BIAS, LAYER_LEVEL_27_WEIGHTS, DepthwiseConv2DLayer::Padding::PADDING_VALID));
+    // Layer28
+    res.layers.emplace_back(new Relu2DLayer);
+    // Layer29
+    res.layers.emplace_back(new Conv2DLayer(128, 1, 1, 1, LAYER_LEVEL_29_BIAS, LAYER_LEVEL_29_WEIGHTS, Conv2DLayer::Padding::PADDING_SAME));
+    // Layer30
+    res.layers.emplace_back(new Relu2DLayer);
+    // Layer31
+    res.layers.emplace_back(new DepthwiseConv2DLayer(3, 3, 1, LAYER_LEVEL_31_BIAS, LAYER_LEVEL_31_WEIGHTS, DepthwiseConv2DLayer::Padding::PADDING_SAME));
+    // Layer32
+    res.layers.emplace_back(new Relu2DLayer);
+    // Layer33
+    res.layers.emplace_back(new Conv2DLayer(128, 1, 1, 1, LAYER_LEVEL_33_BIAS, LAYER_LEVEL_33_WEIGHTS, Conv2DLayer::Padding::PADDING_SAME));
+    // Layer34
+    res.layers.emplace_back(new Relu2DLayer);
+    // Layer35
+    res.layers.emplace_back(new DepthwiseConv2DLayer(3, 3, 1, LAYER_LEVEL_35_BIAS, LAYER_LEVEL_35_WEIGHTS, DepthwiseConv2DLayer::Padding::PADDING_SAME));
+    // Layer36
+    res.layers.emplace_back(new Relu2DLayer);
+    // Layer37
+    res.layers.emplace_back(new Conv2DLayer(128, 1, 1, 1, LAYER_LEVEL_37_BIAS, LAYER_LEVEL_37_WEIGHTS, Conv2DLayer::Padding::PADDING_SAME));
+    // Layer38
+    res.layers.emplace_back(new Relu2DLayer);
+    // Layer39
+    res.layers.emplace_back(new DepthwiseConv2DLayer(3, 3, 1, LAYER_LEVEL_39_BIAS, LAYER_LEVEL_39_WEIGHTS, DepthwiseConv2DLayer::Padding::PADDING_SAME));
+    // Layer40
+    res.layers.emplace_back(new Relu2DLayer);
+    // Layer41
+    res.layers.emplace_back(new Conv2DLayer(128, 1, 1, 1, LAYER_LEVEL_41_BIAS, LAYER_LEVEL_41_WEIGHTS, Conv2DLayer::Padding::PADDING_SAME));
+    // Layer42
+    res.layers.emplace_back(new Relu2DLayer);
+    // Layer43
+    res.layers.emplace_back(new DepthwiseConv2DLayer(3, 3, 1, LAYER_LEVEL_43_BIAS, LAYER_LEVEL_43_WEIGHTS, DepthwiseConv2DLayer::Padding::PADDING_SAME));
+    // Layer44
+    res.layers.emplace_back(new Relu2DLayer);
+    // Layer45
+    res.layers.emplace_back(new Conv2DLayer(128, 1, 1, 1, LAYER_LEVEL_45_BIAS, LAYER_LEVEL_45_WEIGHTS, Conv2DLayer::Padding::PADDING_SAME));
+    // Layer46
+    res.layers.emplace_back(new Relu2DLayer);
+    // Layer47
+    res.layers.emplace_back(new DepthwiseConv2DLayer(3, 3, 1, LAYER_LEVEL_47_BIAS, LAYER_LEVEL_47_WEIGHTS, DepthwiseConv2DLayer::Padding::PADDING_SAME));
+    // Layer48
+    res.layers.emplace_back(new Relu2DLayer);
+    // Layer49
+    res.layers.emplace_back(new Conv2DLayer(128, 1, 1, 1, LAYER_LEVEL_49_BIAS, LAYER_LEVEL_49_WEIGHTS, Conv2DLayer::Padding::PADDING_SAME));
+    // Layer50
+    res.layers.emplace_back(new Relu2DLayer);
+    // Layer51
+    res.layers.emplace_back(new ZeroPadding2DLayer);
+    // Layer52
+    res.layers.emplace_back(new DepthwiseConv2DLayer(3, 3, 2, LAYER_LEVEL_52_BIAS, LAYER_LEVEL_52_WEIGHTS, DepthwiseConv2DLayer::Padding::PADDING_VALID));
+    // Layer53
+    res.layers.emplace_back(new Relu2DLayer);
+    // Layer54
+    res.layers.emplace_back(new Conv2DLayer(256, 1, 1, 1, LAYER_LEVEL_54_BIAS, LAYER_LEVEL_54_WEIGHTS, Conv2DLayer::Padding::PADDING_SAME));
+    // Layer55
+    res.layers.emplace_back(new Relu2DLayer);
+    // Layer56
+    res.layers.emplace_back(new DepthwiseConv2DLayer(3, 3, 1, LAYER_LEVEL_56_BIAS, LAYER_LEVEL_56_WEIGHTS, DepthwiseConv2DLayer::Padding::PADDING_SAME));
+    // Layer57
+    res.layers.emplace_back(new Relu2DLayer);
+    // Layer58
+    res.layers.emplace_back(new Conv2DLayer(256, 1, 1, 1, LAYER_LEVEL_58_BIAS, LAYER_LEVEL_58_WEIGHTS, Conv2DLayer::Padding::PADDING_SAME));
+    // Layer59
+    res.layers.emplace_back(new Relu2DLayer);
     // Layer60
     // Layer61
     return res;
