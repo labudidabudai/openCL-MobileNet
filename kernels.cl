@@ -1,9 +1,7 @@
 __kernel void preprocess_image(__global float* data) {
-    const float one = 1.0;
-    const float coef = 127.5;
     int myid = get_global_id(0);
-    data[myid] = data[myid] / coef;
-    data[myid] = data[myid] - one;
+    data[myid] = data[myid] / 127.5;
+    data[myid] = data[myid] - 1;
 }
 
 __kernel void zeropadding2d(__global const float* input, __global float* output, int width, int height, int depth,

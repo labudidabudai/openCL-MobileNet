@@ -8,6 +8,7 @@
 #include <memory>
 #include <cassert>
 #include <iomanip>
+#include <sys/time.h>
 
 using namespace trained_layers;
 
@@ -17,6 +18,10 @@ namespace {
     cl::CommandQueue queue;
 }
 
+float get_seconds(struct timeval timeStart, struct timeval timeEnd) {
+    return ((timeEnd.tv_sec - timeStart.tv_sec) * 1000000 + timeEnd.tv_usec - timeStart.tv_usec) / 1.e6;
+}
+
 struct Data {
     int width = 1;
     int height = 1;
@@ -24,12 +29,10 @@ struct Data {
     std::vector<float> data;
 };
 
-void debug(cl_int error) {
-#ifdef DEBUG
+void check_error(cl_int error) {
     if (error != CL_SUCCESS) {
         throw std::runtime_error(std::string("Error in OpenCL function") + std::to_string(error));
     }
-#endif
 }
 
 // --------------------
@@ -129,30 +132,30 @@ Data ZeroPadding2DLayer::apply(std::vector<float>& input) {
     cl::Event to_wait;
     cl::Buffer buffer(context, CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR, sizeof(float) * input.size(), input.data(), &err);
     cl::Buffer buffer2(context, CL_MEM_READ_WRITE | CL_MEM_USE_HOST_PTR, sizeof(float) * output.size(), output.data(), &err);
-    debug(err);
+    check_error(err);
     cl::Kernel kernel(program, "zeropadding2d", &err);
-    debug(err);
+    check_error(err);
     err = kernel.setArg(0, buffer);
-    debug(err);
+    check_error(err);
     err = kernel.setArg(1, buffer2);
-    debug(err);
+    check_error(err);
     err = kernel.setArg(2, input_dimension_0);
-    debug(err);
+    check_error(err);
     err = kernel.setArg(3, input_dimension_1);
-    debug(err);
+    check_error(err);
     err = kernel.setArg(4, input_dimension_2);
-    debug(err);
+    check_error(err);
     err = kernel.setArg(5, pad_start_0);
-    debug(err);
+    check_error(err);
     err = kernel.setArg(6, pad_end_0);
-    debug(err);
+    check_error(err);
     err = kernel.setArg(7, pad_start_1);
-    debug(err);
+    check_error(err);
     err = kernel.setArg(8, pad_end_1);
-    debug(err);
+    check_error(err);
     err = queue.enqueueNDRangeKernel(kernel, cl::NullRange, cl::NDRange(input_dimension_0, input_dimension_1, input_dimension_2),
             cl::NullRange, nullptr, &to_wait);
-    debug(err);
+    check_error(err);
     to_wait.wait();
     Data res;
     res.width = input_dimension_0 + pad_start_0 + pad_end_0;
@@ -170,12 +173,12 @@ Data Conv2DLayer::apply(std::vector<float>& input) {
         res.width = (input_dimension_0 - 1) / strides;
         res.height = (input_dimension_1 - 1) / strides;
         kernel.reset(new cl::Kernel(program, "conv2d_kernel_9_valid", &err));
-        debug(err);
+        check_error(err);
     } else if (conv_size0 == 1 && conv_size1 == 1 && padding == Padding::PADDING_SAME) {
         res.width = input_dimension_0;
         res.height = input_dimension_1;
         kernel.reset(new cl::Kernel(program, "conv2d_kernel_1_same", &err));
-        debug(err);
+        check_error(err);
     } else {
         throw std::runtime_error("This case is not implemented");
     }
@@ -187,25 +190,25 @@ Data Conv2DLayer::apply(std::vector<float>& input) {
     cl::Buffer buffer2(context, CL_MEM_READ_WRITE | CL_MEM_USE_HOST_PTR, sizeof(float) * output.size(), output.data(), &err);
     cl::Buffer buffer3(context, CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR, sizeof(float) * input_dimension_2 * conv_size0 * conv_size1 * out_depth, kernels, &err);
     cl::Buffer buffer4(context, CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR, sizeof(float) * out_depth, bias, &err); // TODO: bias can be separate kernel for all layers
-    debug(err);
+    check_error(err);
     err = kernel->setArg(0, buffer);
-    debug(err);
+    check_error(err);
     err = kernel->setArg(1, buffer2);
-    debug(err);
+    check_error(err);
     err = kernel->setArg(2, buffer3);
-    debug(err);
+    check_error(err);
     err = kernel->setArg(3, buffer4);
-    debug(err);
+    check_error(err);
     err = kernel->setArg(4, strides);
-    debug(err);
+    check_error(err);
     err = kernel->setArg(5, input_dimension_2);
-    debug(err);
+    check_error(err);
     err = kernel->setArg(6, input_dimension_0);
-    debug(err);
+    check_error(err);
     err = kernel->setArg(7, out_depth);
-    debug(err);
+    check_error(err);
     err = queue.enqueueNDRangeKernel(*kernel, cl::NullRange, cl::NDRange(res.width, res.height, out_depth), cl::NullRange, nullptr, &to_wait);
-    debug(err);
+    check_error(err);
     to_wait.wait();
     res.data = std::move(output);
     return res;
@@ -215,13 +218,13 @@ Data Relu2DLayer::apply(std::vector<float>& input) {
     cl_int err;
     cl::Event to_wait;
     cl::Buffer buffer(context, CL_MEM_READ_WRITE | CL_MEM_USE_HOST_PTR, sizeof(float) * input.size(), input.data(), &err);
-    debug(err);
+    check_error(err);
     cl::Kernel kernel(program, "relu", &err);
-    debug(err);
+    check_error(err);
     err = kernel.setArg(0, buffer);
-    debug(err);
+    check_error(err);
     err = queue.enqueueNDRangeKernel(kernel, cl::NullRange, cl::NDRange(input.size()), cl::NullRange, nullptr, &to_wait);
-    debug(err);
+    check_error(err);
     to_wait.wait();
     Data res;
     res.width = input_dimension_0;
@@ -243,13 +246,13 @@ Data DepthwiseConv2DLayer::apply(std::vector<float>& input) {
         res.height = (input_dimension_1 - 1) / strides;
         res.channels = input_dimension_2;
         kernel.reset(new cl::Kernel(program, "depthwise_conv2d_kernel_9_valid", &err));
-        debug(err);
+        check_error(err);
     } else {
         res.width = input_dimension_0;
         res.height = input_dimension_1;
         res.channels = input_dimension_2;
         kernel.reset(new cl::Kernel(program, "depthwise_conv2d_kernel_9_same", &err));
-        debug(err);
+        check_error(err);
     }
 
     std::vector<float> output(res.width * res.height * input_dimension_2, 0);
@@ -258,25 +261,25 @@ Data DepthwiseConv2DLayer::apply(std::vector<float>& input) {
     cl::Buffer buffer2(context, CL_MEM_READ_WRITE | CL_MEM_USE_HOST_PTR, sizeof(float) * output.size(), output.data(), &err);
     cl::Buffer buffer3(context, CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR, sizeof(float) * input_dimension_2 * conv_size0 * conv_size1, kernels, &err);
     cl::Buffer buffer4(context, CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR, sizeof(float) * input_dimension_2, bias, &err);
-    debug(err);
+    check_error(err);
     err = kernel->setArg(0, buffer);
-    debug(err);
+    check_error(err);
     err = kernel->setArg(1, buffer2);
-    debug(err);
+    check_error(err);
     err = kernel->setArg(2, buffer3);
-    debug(err);
+    check_error(err);
     err = kernel->setArg(3, buffer4);
-    debug(err);
+    check_error(err);
     err = kernel->setArg(4, strides);
-    debug(err);
+    check_error(err);
     err = kernel->setArg(5, input_dimension_2);
-    debug(err);
+    check_error(err);
     err = kernel->setArg(6, res.width);
-    debug(err);
+    check_error(err);
     err = kernel->setArg(7, res.height);
-    debug(err);
+    check_error(err);
     err = queue.enqueueNDRangeKernel(*kernel, cl::NullRange, cl::NDRange(res.width, res.height, input_dimension_2), cl::NullRange, nullptr, &to_wait);
-    debug(err);
+    check_error(err);
     to_wait.wait();
     res.data = std::move(output);
     return res;
@@ -293,32 +296,32 @@ Data GlobalAveragePooling2DLayer::apply(std::vector<float>& input) {
     cl_int err;
     cl::Buffer buffer(context, CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR, sizeof(float) * input.size(), input.data(), &err);
     cl::Buffer buffer2(context, CL_MEM_READ_WRITE | CL_MEM_USE_HOST_PTR, sizeof(float) * output.size(), output.data(), &err);
-    debug(err);
+    check_error(err);
 
     {
         cl::Kernel kernel(program, "sum_by_channels", &err);
-        debug(err);
+        check_error(err);
         err = kernel.setArg(0, buffer);
-        debug(err);
+        check_error(err);
         err = kernel.setArg(1, buffer2);
-        debug(err);
+        check_error(err);
         err = kernel.setArg(2, res.channels);
-        debug(err);
+        check_error(err);
         err = queue.enqueueNDRangeKernel(kernel, cl::NullRange, cl::NDRange(input.size()), cl::NullRange, nullptr, &to_wait);
-        debug(err);
+        check_error(err);
         to_wait.wait();
     }
 
     {
         float reduction_coef = input_dimension_0 * input_dimension_1;
         cl::Kernel kernel(program, "apply_reduction", &err);
-        debug(err);
+        check_error(err);
         err = kernel.setArg(0, buffer2);
-        debug(err);
+        check_error(err);
         err = kernel.setArg(1, reduction_coef);
-        debug(err);
+        check_error(err);
         err = queue.enqueueNDRangeKernel(kernel, cl::NullRange, cl::NDRange(output.size()), cl::NullRange, nullptr, &to_wait);
-        debug(err);
+        check_error(err);
         to_wait.wait();
     }
 
@@ -342,59 +345,59 @@ Data Dense2DLayer::apply(std::vector<float>& input) {
     cl::Buffer buffer3(context, CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR, sizeof(float) * output.size() * input.size(), weights, &err);
     cl::Buffer buffer4(context, CL_MEM_READ_WRITE | CL_MEM_USE_HOST_PTR, sizeof(float), &max_value, &err);
     cl::Buffer buffer5(context, CL_MEM_READ_WRITE | CL_MEM_USE_HOST_PTR, sizeof(float), &sum, &err);
-    debug(err);
+    check_error(err);
 
     {
         cl::Kernel kernel(program, "matrix_multiplication", &err);
-        debug(err);
+        check_error(err);
         err = kernel.setArg(0, buffer);
-        debug(err);
+        check_error(err);
         err = kernel.setArg(1, buffer3);
-        debug(err);
+        check_error(err);
         err = kernel.setArg(2, buffer2);
-        debug(err);
+        check_error(err);
         err = kernel.setArg(3, input_dimension_2);
-        debug(err);
+        check_error(err);
         err = queue.enqueueNDRangeKernel(kernel, cl::NullRange, cl::NDRange(output.size()), cl::NullRange, nullptr, &to_wait);
-        debug(err);
+        check_error(err);
         to_wait.wait();
     }
 
     {
         cl::Kernel kernel(program, "max_value", &err);
-        debug(err);
+        check_error(err);
         err = kernel.setArg(0, buffer2);
-        debug(err);
+        check_error(err);
         err = kernel.setArg(1, buffer4);
-        debug(err);
+        check_error(err);
         err = queue.enqueueNDRangeKernel(kernel, cl::NullRange, cl::NDRange(output.size()), cl::NullRange, nullptr, &to_wait);
-        debug(err);
+        check_error(err);
         to_wait.wait();
     }
 
     {
         cl::Kernel kernel(program, "softmax", &err);
-        debug(err);
+        check_error(err);
         err = kernel.setArg(0, buffer2);
-        debug(err);
+        check_error(err);
         err = kernel.setArg(1, max_value);
-        debug(err);
+        check_error(err);
         err = kernel.setArg(2, buffer5);
-        debug(err);
+        check_error(err);
         err = queue.enqueueNDRangeKernel(kernel, cl::NullRange, cl::NDRange(output.size()), cl::NullRange, nullptr, &to_wait);
-        debug(err);
+        check_error(err);
         to_wait.wait();
     }
 
     {
         cl::Kernel kernel(program, "apply_reduction", &err);
-        debug(err);
+        check_error(err);
         err = kernel.setArg(0, buffer2);
-        debug(err);
+        check_error(err);
         err = kernel.setArg(1, sum);
-        debug(err);
+        check_error(err);
         err = queue.enqueueNDRangeKernel(kernel, cl::NullRange, cl::NDRange(output.size()), cl::NullRange, nullptr, &to_wait);
-        debug(err);
+        check_error(err);
         to_wait.wait();
     }
 
@@ -543,14 +546,14 @@ void preprocess_image(Data& image) {
     cl_int err;
     cl::Event to_wait;
     cl::Buffer buffer(context, CL_MEM_READ_WRITE | CL_MEM_USE_HOST_PTR, sizeof(float) * image.data.size(), image.data.data(), &err);
-    debug(err);
+    check_error(err);
     cl::Kernel kernel(program, "preprocess_image", &err);
-    debug(err);
+    check_error(err);
     err = kernel.setArg(0, buffer);
-    debug(err);
+    check_error(err);
     err = queue.enqueueNDRangeKernel(kernel, cl::NullRange, cl::NDRange(image.data.size()), cl::NullRange,
                                      nullptr, &to_wait);
-    debug(err);
+    check_error(err);
     to_wait.wait();
 }
 
@@ -583,6 +586,13 @@ std::vector<float> apply_mobilenet(const Data& image) {
     return features.data;
 }
 
+void setup_context(const std::vector<cl::Device>& devices) {
+    // В этой функции настраивается контекст выполнения.
+    // Эту функцию можно менять в зависимости от того, какие устройства имеются на компьютере
+    auto device = devices.front();
+    context = cl::Context({device});
+}
+
 int main(int argc, char** argv) {
     if (argc != 3) {
         std::cout << "Usage: " << argv[0] << " source_file output_file" << std::endl;
@@ -590,11 +600,17 @@ int main(int argc, char** argv) {
     }
     std::vector<cl::Platform> platforms;
     auto err = cl::Platform::get(&platforms);
-    debug(err);
+    check_error(err);
     std::vector<cl::Device> devices;
     err = platforms.front().getDevices(CL_DEVICE_TYPE_ALL, &devices);
-    debug(err);
-    auto device = devices.front();
+    check_error(err);
+
+    setup_context(devices);
+
+    struct timeval timeStart, timeEnd;
+    float deltaTime;
+
+    gettimeofday(&timeStart, NULL);
 
     std::vector<Data> images;
     {
@@ -619,17 +635,35 @@ int main(int argc, char** argv) {
             images.push_back(image);
         }
     }
-    context = cl::Context({device});
+    gettimeofday(&timeEnd, NULL);
+    deltaTime = get_seconds(timeStart, timeEnd);
+    printf("Reading images time: %.3lf sec\n", deltaTime);
+
+    gettimeofday(&timeStart, NULL);
+
     std::ifstream kernel_file("kernels.cl");
     std::string kernel_code(std::istreambuf_iterator<char>(kernel_file), (std::istreambuf_iterator<char>()));
     cl::Program::Sources sources;
     sources.push_back({kernel_code.c_str(), kernel_code.length()});
     program = cl::Program(context, sources, &err);
-    debug(err);
-    err = program.build({device});
-    debug(err);
-    queue = cl::CommandQueue(context, device);
+    check_error(err);
+    err = program.build();
+    check_error(err);
+    queue = cl::CommandQueue(context);
+
+    gettimeofday(&timeEnd, NULL);
+    deltaTime = get_seconds(timeStart, timeEnd);
+    printf("Starting OpenCL: %.3lf sec\n", deltaTime);
+
+    gettimeofday(&timeStart, NULL);
+
     mobile_net = init_mobilenet();
+
+    gettimeofday(&timeEnd, NULL);
+    deltaTime = get_seconds(timeStart, timeEnd);
+    printf("Initialization of model and read weights: %.3lf sec\n", deltaTime);
+
+    gettimeofday(&timeStart, NULL);
     std::vector<float> res;
     std::ofstream output_file(argv[2]);
     for (auto& image : images) {
@@ -641,5 +675,9 @@ int main(int argc, char** argv) {
         output_file << std::endl;
     }
     cl::finish();
+
+    gettimeofday(&timeEnd, NULL);
+    deltaTime = get_seconds(timeStart, timeEnd);
+    printf("Handling %d images: %.3lf sec\n", images.size(), deltaTime);
     return 0;
 }

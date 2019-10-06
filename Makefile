@@ -1,15 +1,13 @@
-OPENCL_LIB_PATH=/opt/intel/system_studio_2019/opencl/SDK/lib64
-
 default: main
 
 devices:
 	g++ devices.cpp -L${OPENCL_LIB_PATH} -lOpenCL -o devices
 
 main:
-	g++ main.cpp -L${OPENCL_LIB_PATH} -lOpenCL -o opencl_matrixnet
+	g++ main.cpp -L${OPENCL_LIB_PATH} -lOpenCL -o opencl_mobilenet
 
 with_debug:
-	g++ main.cpp -L${OPENCL_LIB_PATH} -DDEBUG -DDEBUG_LAYERS -lOpenCL -o opencl_matrixnet_debug
+	g++ main.cpp -L${OPENCL_LIB_PATH} -DDEBUG_LAYERS -lOpenCL -o opencl_mobilenet_debug
 
 clear:
 	rm main
