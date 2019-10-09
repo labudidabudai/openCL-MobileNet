@@ -126,9 +126,11 @@ __kernel void relu(__global float* data) {
     }
 }
 
-__kernel void sum_by_channels(__global const float* input, __global float* output, int num_channels) {
+__kernel void sum_by_channels(__global const float* input, __global float* output, int num_channels, int input_size) {
     int x = get_global_id(0);
-    output[x % num_channels] += input[x];
+    for (int i = x; i < input_size; i += num_channels) {
+        output[x] += input[i];
+    }
 }
 
 __kernel void apply_reduction(__global float* data, float reduction_coef) {

@@ -307,7 +307,10 @@ Data GlobalAveragePooling2DLayer::apply(std::vector<float>& input) {
         check_error(err);
         err = kernel.setArg(2, res.channels);
         check_error(err);
-        err = queue.enqueueNDRangeKernel(kernel, cl::NullRange, cl::NDRange(input.size()), cl::NullRange, nullptr, &to_wait);
+        int size = input.size();
+        err = kernel.setArg(3, size);
+        check_error(err);
+        err = queue.enqueueNDRangeKernel(kernel, cl::NullRange, cl::NDRange(output.size()), cl::NullRange, nullptr, &to_wait);
         check_error(err);
         to_wait.wait();
     }
