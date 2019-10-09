@@ -146,6 +146,8 @@ __kernel void matrix_multiplication(__global const float* input, __global const 
     }
 }
 
+// FIXME: max_value and softmax don't work correct, we must write correct reduction with barriers and local results
+// But in MobileNet there's no need of this, because we work with only 2 floats, it's a lot of overhead to run these funcitons in OpenCL
 __kernel void max_value(__global const float* data, __global float* max_val) {
     int index = get_global_id(0);
     *max_val = max(*max_val, data[index]);

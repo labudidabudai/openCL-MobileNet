@@ -9,6 +9,7 @@
 #include <cassert>
 #include <iomanip>
 #include <sys/time.h>
+#include <cmath>
 
 using namespace trained_layers;
 
@@ -366,30 +367,45 @@ Data Dense2DLayer::apply(std::vector<float>& input) {
         to_wait.wait();
     }
 
-    {
-        cl::Kernel kernel(program, "max_value", &err);
-        check_error(err);
-        err = kernel.setArg(0, buffer2);
-        check_error(err);
-        err = kernel.setArg(1, buffer4);
-        check_error(err);
-        err = queue.enqueueNDRangeKernel(kernel, cl::NullRange, cl::NDRange(output.size()), cl::NullRange, nullptr, &to_wait);
-        check_error(err);
-        to_wait.wait();
+// FIXME: max_value and softmax don't work correct, we must write correct reduction with barriers and local results
+// But in MobileNet there's no need of this, because we work with only 2 floats, it's a lot of overhead to run these funcitons in OpenCL
+
+//    {
+//        cl::Kernel kernel(program, "max_value", &err);
+//        check_error(err);
+//        err = kernel.setArg(0, buffer2);
+//        check_error(err);
+//        err = kernel.setArg(1, buffer4);
+//        check_error(err);
+//        err = queue.enqueueNDRangeKernel(kernel, cl::NullRange, cl::NDRange(output.size()), cl::NullRange, nullptr, &to_wait);
+//        check_error(err);
+//        to_wait.wait();
+//    }
+//
+//    {
+//        cl::Kernel kernel(program, "softmax", &err);
+//        check_error(err);
+//        err = kernel.setArg(0, buffer2);
+//        check_error(err);
+//        err = kernel.setArg(1, max_value);
+//        check_error(err);
+//        err = kernel.setArg(2, buffer5);
+//        check_error(err);
+//        err = queue.enqueueNDRangeKernel(kernel, cl::NullRange, cl::NDRange(output.size()), cl::NullRange, nullptr, &to_wait);
+//        check_error(err);
+//        to_wait.wait();
+//    }
+
+    // Handle data on host
+    for (const auto& item : output) {
+        if (item > max_value) {
+            max_value = item;
+        }
     }
 
-    {
-        cl::Kernel kernel(program, "softmax", &err);
-        check_error(err);
-        err = kernel.setArg(0, buffer2);
-        check_error(err);
-        err = kernel.setArg(1, max_value);
-        check_error(err);
-        err = kernel.setArg(2, buffer5);
-        check_error(err);
-        err = queue.enqueueNDRangeKernel(kernel, cl::NullRange, cl::NDRange(output.size()), cl::NullRange, nullptr, &to_wait);
-        check_error(err);
-        to_wait.wait();
+    for (auto& item : output) {
+        item = std::exp(item - max_value);
+        sum += item;
     }
 
     {
