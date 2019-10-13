@@ -1,16 +1,25 @@
-default: main
+main: create_dir
+	make main -C src
 
-devices:
-	g++ devices.cpp -L${OPENCL_LIB_PATH} -lOpenCL -o devices
+all: create_dir
+	make all -C src
 
-main:
-	g++ main.cpp -L${OPENCL_LIB_PATH} -lOpenCL -o opencl_mobilenet
+devices: create_dir
+	make devices -C src
 
-with_debug:
-	g++ main.cpp -L${OPENCL_LIB_PATH} -DDEBUG_LAYERS -lOpenCL -o opencl_mobilenet_debug
+with_debug: create_dir
+	make with_debug -C src
+
+compare_outputs: create_dir
+	make compare_outputs -C src
+
+create_dir:
+	mkdir -p bin
 
 clear:
-	rm opencl_mobilenet opencl_mobilenet_debug devices
+	rm -f bin/*
 
-compare_outputs:
-	g++ compare_outputs.cpp -L${OPENCL_LIB_PATH} -lOpenCL -o compare_outputs
+test: main compare_outputs
+	cd bin && ./opencl_mobilenet ../test/images_list.txt test_output.txt
+	bin/compare_outputs bin/test_output.txt test/etalon_output.txt
+	rm bin/test_output.txt

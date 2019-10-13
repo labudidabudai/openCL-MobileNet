@@ -24,9 +24,9 @@ int main(int argc, char** argv) {
     }
     std::cout << "Difference is " << (res / counter) << std::endl;
     if (res / counter < 1e-6) {
-        std::cout << "Test passed" << std::endl;
+        std::cout << "========== Test passed ==========" << std::endl;
     } else {
-        std::cout << "Test failed" << std::endl;
+        std::cout << "========== Test failed ==========" << std::endl;
     }
     return 0;
 }
