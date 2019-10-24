@@ -154,10 +154,19 @@ Data ZeroPadding2DLayer::apply(std::vector<float>& input) {
     check_error(err);
     err = kernel.setArg(8, pad_end_1);
     check_error(err);
+
     err = queue.enqueueNDRangeKernel(kernel, cl::NullRange, cl::NDRange(input_dimension_0, input_dimension_1, input_dimension_2),
             cl::NullRange, nullptr, &to_wait);
     check_error(err);
     to_wait.wait();
+
+    void* map_ptr = queue.enqueueMapBuffer(buffer2, false, CL_MAP_READ, 0, sizeof(float) * output.size(), nullptr,
+                                            nullptr, &err);
+    check_error(err);
+    queue.enqueueUnmapMemObject(buffer2, map_ptr, nullptr, &to_wait);
+    check_error(err);
+    to_wait.wait();
+
     Data res;
     res.width = input_dimension_0 + pad_start_0 + pad_end_0;
     res.height = input_dimension_1 + pad_start_1 + pad_end_1;
@@ -211,6 +220,14 @@ Data Conv2DLayer::apply(std::vector<float>& input) {
     err = queue.enqueueNDRangeKernel(*kernel, cl::NullRange, cl::NDRange(res.width, res.height, out_depth), cl::NullRange, nullptr, &to_wait);
     check_error(err);
     to_wait.wait();
+
+    void* map_ptr = queue.enqueueMapBuffer(buffer2, false, CL_MAP_READ, 0, sizeof(float) * output.size(), nullptr,
+                                           nullptr, &err);
+    check_error(err);
+    queue.enqueueUnmapMemObject(buffer2, map_ptr, nullptr, &to_wait);
+    check_error(err);
+    to_wait.wait();
+
     res.data = std::move(output);
     return res;
 }
@@ -227,6 +244,14 @@ Data Relu2DLayer::apply(std::vector<float>& input) {
     err = queue.enqueueNDRangeKernel(kernel, cl::NullRange, cl::NDRange(input.size()), cl::NullRange, nullptr, &to_wait);
     check_error(err);
     to_wait.wait();
+
+    void* map_ptr = queue.enqueueMapBuffer(buffer, false, CL_MAP_READ, 0, sizeof(float) * input.size(), nullptr,
+                                           nullptr, &err);
+    check_error(err);
+    queue.enqueueUnmapMemObject(buffer, map_ptr, nullptr, &to_wait);
+    check_error(err);
+    to_wait.wait();
+
     Data res;
     res.width = input_dimension_0;
     res.height = input_dimension_1;
@@ -282,6 +307,14 @@ Data DepthwiseConv2DLayer::apply(std::vector<float>& input) {
     err = queue.enqueueNDRangeKernel(*kernel, cl::NullRange, cl::NDRange(res.width, res.height, input_dimension_2), cl::NullRange, nullptr, &to_wait);
     check_error(err);
     to_wait.wait();
+
+    void* map_ptr = queue.enqueueMapBuffer(buffer2, false, CL_MAP_READ, 0, sizeof(float) * output.size(), nullptr,
+                                           nullptr, &err);
+    check_error(err);
+    queue.enqueueUnmapMemObject(buffer2, map_ptr, nullptr, &to_wait);
+    check_error(err);
+    to_wait.wait();
+
     res.data = std::move(output);
     return res;
 }
@@ -329,6 +362,14 @@ Data GlobalAveragePooling2DLayer::apply(std::vector<float>& input) {
         to_wait.wait();
     }
 
+    void* map_ptr = queue.enqueueMapBuffer(buffer2, false, CL_MAP_READ, 0, sizeof(float) * output.size(), nullptr,
+                                           nullptr, &err);
+    check_error(err);
+    queue.enqueueUnmapMemObject(buffer2, map_ptr, nullptr, &to_wait);
+    check_error(err);
+    to_wait.wait();
+
+
     res.data = std::move(output);
     return res;
 }
@@ -366,6 +407,14 @@ Data Dense2DLayer::apply(std::vector<float>& input) {
         check_error(err);
         to_wait.wait();
     }
+
+    void* map_ptr = queue.enqueueMapBuffer(buffer2, false, CL_MAP_READ, 0, sizeof(float) * output.size(), nullptr,
+                                           nullptr, &err);
+    check_error(err);
+    queue.enqueueUnmapMemObject(buffer2, map_ptr, nullptr, &to_wait);
+    check_error(err);
+    to_wait.wait();
+
 
 // FIXME: max_value and softmax don't work correct, we must write correct reduction with barriers and local results
 // But in MobileNet there's no need of this, because we work with only 2 floats, it's a lot of overhead to run these funcitons in OpenCL
@@ -419,6 +468,14 @@ Data Dense2DLayer::apply(std::vector<float>& input) {
         check_error(err);
         to_wait.wait();
     }
+
+    map_ptr = queue.enqueueMapBuffer(buffer2, false, CL_MAP_READ, 0, sizeof(float) * output.size(), nullptr,
+                                           nullptr, &err);
+    check_error(err);
+    queue.enqueueUnmapMemObject(buffer2, map_ptr, nullptr, &to_wait);
+    check_error(err);
+    to_wait.wait();
+
 
     res.data = std::move(output);
     return res;
@@ -572,6 +629,13 @@ void preprocess_image(Data& image) {
     check_error(err);
     err = queue.enqueueNDRangeKernel(kernel, cl::NullRange, cl::NDRange(image.data.size()), cl::NullRange,
                                      nullptr, &to_wait);
+    check_error(err);
+    to_wait.wait();
+
+    void* map_ptr = queue.enqueueMapBuffer(buffer, false, CL_MAP_READ, 0, sizeof(float) * image.data.size(), nullptr,
+                                           nullptr, &err);
+    check_error(err);
+    queue.enqueueUnmapMemObject(buffer, map_ptr, nullptr, &to_wait);
     check_error(err);
     to_wait.wait();
 }
