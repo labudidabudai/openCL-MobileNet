@@ -138,23 +138,26 @@ __kernel void apply_reduction(__global float* data, float reduction_coef) {
     data[index] /= reduction_coef;
 }
 
-__kernel void matrix_multiplication(__global const float* input, __global const float* weights, __global float* output,
-                                    int in_shape) {
+__kernel void dense_layer(__global const float* input, __global const float* weights, __global float* output,
+                                    int in_shape, int out_shape) {
     int y = get_global_id(0);
     for (int x = 0; x < in_shape; ++x) {
         output[y] += input[x] * weights[y * in_shape + x];
     }
-}
-
-// FIXME: max_value and softmax don't work correct, we must write correct reduction with barriers and local results
-// But in MobileNet there's no need of this, because we work with only 2 floats, it's a lot of overhead to run these funcitons in OpenCL
-__kernel void max_value(__global const float* data, __global float* max_val) {
-    int index = get_global_id(0);
-    *max_val = max(*max_val, data[index]);
-}
-
-__kernel void softmax(__global float* data, float max_val, __global float* sum) {
-    int index = get_global_id(0);
-    data[index] = exp(data[index] - max_val);
-    *sum += data[index];
+    barrier(CLK_LOCAL_MEM_FENCE | CLK_GLOBAL_MEM_FENCE);
+    // Софтмакс считается на одном ядре, просто потому что это работа с двумя выходными нейронами, параллелить их просто бессмысленно
+    if (y == 0) {
+        float max_val = 0;
+        float sum = 0;
+        for (int i = 0; i < out_shape; ++i) {
+              max_val = max(max_val, output[i]);
+        }
+        for (int i = 0; i < out_shape; ++i) {
+            output[i] = exp(output[i] - max_val);
+            sum += output[i];
+        }
+        for (int i = 0; i < out_shape; ++i) {
+            output[i] /= sum;
+        }
+    }
 }

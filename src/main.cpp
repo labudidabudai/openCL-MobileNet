@@ -393,7 +393,7 @@ Data Dense2DLayer::apply(std::vector<float>& input) {
     check_error(err);
 
     {
-        cl::Kernel kernel(program, "matrix_multiplication", &err);
+        cl::Kernel kernel(program, "dense_layer", &err);
         check_error(err);
         err = kernel.setArg(0, buffer);
         check_error(err);
@@ -403,7 +403,9 @@ Data Dense2DLayer::apply(std::vector<float>& input) {
         check_error(err);
         err = kernel.setArg(3, input_dimension_2);
         check_error(err);
-        err = queue.enqueueNDRangeKernel(kernel, cl::NullRange, cl::NDRange(output.size()), cl::NullRange, nullptr, &to_wait);
+        err = kernel.setArg(4, res.channels);
+        check_error(err);
+        err = queue.enqueueNDRangeKernel(kernel, cl::NullRange, cl::NDRange(output.size()), cl::NDRange(output.size()), nullptr, &to_wait);
         check_error(err);
         to_wait.wait();
     }
@@ -414,68 +416,6 @@ Data Dense2DLayer::apply(std::vector<float>& input) {
     queue.enqueueUnmapMemObject(buffer2, map_ptr, nullptr, &to_wait);
     check_error(err);
     to_wait.wait();
-
-
-// FIXME: max_value and softmax don't work correct, we must write correct reduction with barriers and local results
-// But in MobileNet there's no need of this, because we work with only 2 floats, it's a lot of overhead to run these funcitons in OpenCL
-
-//    {
-//        cl::Kernel kernel(program, "max_value", &err);
-//        check_error(err);
-//        err = kernel.setArg(0, buffer2);
-//        check_error(err);
-//        err = kernel.setArg(1, buffer4);
-//        check_error(err);
-//        err = queue.enqueueNDRangeKernel(kernel, cl::NullRange, cl::NDRange(output.size()), cl::NullRange, nullptr, &to_wait);
-//        check_error(err);
-//        to_wait.wait();
-//    }
-//
-//    {
-//        cl::Kernel kernel(program, "softmax", &err);
-//        check_error(err);
-//        err = kernel.setArg(0, buffer2);
-//        check_error(err);
-//        err = kernel.setArg(1, max_value);
-//        check_error(err);
-//        err = kernel.setArg(2, buffer5);
-//        check_error(err);
-//        err = queue.enqueueNDRangeKernel(kernel, cl::NullRange, cl::NDRange(output.size()), cl::NullRange, nullptr, &to_wait);
-//        check_error(err);
-//        to_wait.wait();
-//    }
-
-    // Handle data on host
-    for (const auto& item : output) {
-        if (item > max_value) {
-            max_value = item;
-        }
-    }
-
-    for (auto& item : output) {
-        item = std::exp(item - max_value);
-        sum += item;
-    }
-
-    {
-        cl::Kernel kernel(program, "apply_reduction", &err);
-        check_error(err);
-        err = kernel.setArg(0, buffer2);
-        check_error(err);
-        err = kernel.setArg(1, sum);
-        check_error(err);
-        err = queue.enqueueNDRangeKernel(kernel, cl::NullRange, cl::NDRange(output.size()), cl::NullRange, nullptr, &to_wait);
-        check_error(err);
-        to_wait.wait();
-    }
-
-    map_ptr = queue.enqueueMapBuffer(buffer2, false, CL_MAP_READ, 0, sizeof(float) * output.size(), nullptr,
-                                           nullptr, &err);
-    check_error(err);
-    queue.enqueueUnmapMemObject(buffer2, map_ptr, nullptr, &to_wait);
-    check_error(err);
-    to_wait.wait();
-
 
     res.data = std::move(output);
     return res;
